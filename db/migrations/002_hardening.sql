@@ -1,0 +1,12 @@
+ALTER TABLE users ADD COLUMN feed_version bigint NOT NULL DEFAULT 0;
+ALTER TABLE outbox ADD COLUMN attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE outbox ADD COLUMN next_attempt_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE outbox ADD COLUMN failed_at timestamptz;
+ALTER TABLE outbox ADD COLUMN last_error text;
+CREATE INDEX likes_post ON likes(post_id);
+CREATE INDEX bookmarks_post ON bookmarks(post_id);
+CREATE INDEX posts_tags ON posts USING gin(tags);
+CREATE INDEX sessions_expiry ON sessions(expires_at);
+CREATE TABLE feed_snapshots(id uuid PRIMARY KEY, user_id bigint NOT NULL REFERENCES users ON DELETE CASCADE, generation bigint NOT NULL, post_ids bigint[] NOT NULL, expires_at timestamptz NOT NULL);
+CREATE INDEX feed_snapshots_expiry ON feed_snapshots(expires_at);
+CREATE INDEX feed_snapshots_user ON feed_snapshots(user_id,generation,expires_at DESC);

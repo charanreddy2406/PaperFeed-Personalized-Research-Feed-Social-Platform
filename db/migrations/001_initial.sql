@@ -1,0 +1,17 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE TABLE users(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, username text UNIQUE NOT NULL, password_hash text NOT NULL, display_name text NOT NULL, interests text[] NOT NULL DEFAULT '{}');
+CREATE TABLE sessions(token_hash text PRIMARY KEY, user_id bigint REFERENCES users ON DELETE CASCADE, expires_at timestamptz NOT NULL);
+CREATE TABLE papers(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, source_url text UNIQUE NOT NULL, title text NOT NULL, abstract text NOT NULL DEFAULT '');
+CREATE TABLE posts(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, author_id bigint NOT NULL REFERENCES users, paper_id bigint NOT NULL REFERENCES papers, title text NOT NULL, content text NOT NULL, tags text[] NOT NULL DEFAULT '{}', embedding vector(384), created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE follows(follower_id bigint REFERENCES users, followee_id bigint REFERENCES users, PRIMARY KEY(follower_id,followee_id), CHECK(follower_id<>followee_id));
+CREATE TABLE likes(user_id bigint REFERENCES users, post_id bigint REFERENCES posts ON DELETE CASCADE, PRIMARY KEY(user_id,post_id));
+CREATE TABLE bookmarks(user_id bigint REFERENCES users, post_id bigint REFERENCES posts ON DELETE CASCADE, PRIMARY KEY(user_id,post_id));
+CREATE TABLE comments(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,user_id bigint NOT NULL REFERENCES users,post_id bigint NOT NULL REFERENCES posts ON DELETE CASCADE,content text NOT NULL,created_at timestamptz DEFAULT now());
+CREATE TABLE media(id uuid PRIMARY KEY,owner_id bigint NOT NULL REFERENCES users,post_id bigint REFERENCES posts ON DELETE SET NULL,object_key text UNIQUE NOT NULL,content_type text NOT NULL, size_bytes bigint NOT NULL,state text NOT NULL CHECK(state IN ('pending','uploaded','attached','deleted')),created_at timestamptz DEFAULT now());
+CREATE TABLE outbox(id uuid PRIMARY KEY,user_id bigint NOT NULL REFERENCES users,post_id bigint NOT NULL,event_type text NOT NULL,created_at timestamptz DEFAULT now(),published_at timestamptz,processed_at timestamptz);
+CREATE TABLE processed_events(id uuid PRIMARY KEY);
+CREATE TABLE topic_signals(user_id bigint REFERENCES users,topic text,weight double precision NOT NULL DEFAULT 0,PRIMARY KEY(user_id,topic));
+CREATE INDEX posts_recent ON posts(created_at DESC,id DESC);
+CREATE INDEX posts_author ON posts(author_id,created_at DESC);
+CREATE INDEX outbox_pending ON outbox(created_at) WHERE processed_at IS NULL;
+CREATE INDEX comments_post ON comments(post_id);
